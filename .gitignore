@@ -1,0 +1,25 @@
+# Build artifacts and IDE state
+[Bb]in/
+[Oo]bj/
+.vs/
+*.user
+*.suo
+
+# Local copies and backups -- the release DLLs at repository root are intentional.
+*.updated.dll
+*_BIMlify.*.dll
+*.before
+*.bak
+*.orig
+*.cs.before-*
+*.cs.bak-*
+
+# Revit and Windows transient files
+*.log
+*.tmp
+Thumbs.db
+Desktop.ini
+
+# Duplicate staging folders from the local deployment directory.
+Branding/Branding/
+Icons/Icons/

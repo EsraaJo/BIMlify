@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>BIMlify.Revit2024</AssemblyName>
+    <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
+    <UseWindowsForms>True</UseWindowsForms>
+    <TargetFramework>net40</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+  <PropertyGroup>
+    <LangVersion>14.0</LangVersion>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <CheckForOverflowUnderflow>False</CheckForOverflowUnderflow>
+  </PropertyGroup>
+  <PropertyGroup />
+  <ItemGroup />
+  <ItemGroup>
+    <Reference Include="RevitAPIUI"><HintPath>C:\Program Files\Autodesk\Revit 2024\RevitAPIUI.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="RevitAPI"><HintPath>C:\Program Files\Autodesk\Revit 2024\RevitAPI.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="System.Core" />
+    <Reference Include="PresentationCore" />
+    <Reference Include="BIMlify.ModelCleaner">
+      <HintPath>..\..\BIMlify.ModelCleaner.dll</HintPath>
+    </Reference>
+    <Reference Include="BIMlify.ReviewRunGate">
+      <HintPath>..\..\BIMlify.ReviewRunGate.dll</HintPath>
+    </Reference>
+    <Reference Include="BIMlify.ClashLinked">
+      <HintPath>..\..\BIMlify.ClashLinked.dll</HintPath>
+    </Reference>
+    <Reference Include="BIMlify.CleanerUi">
+      <HintPath>..\..\BIMlify.CleanerUi.dll</HintPath>
+    </Reference>
+    <Reference Include="BIMlify.SmartOpenings">
+      <HintPath>..\..\BIMlify.SmartOpenings.dll</HintPath>
+    </Reference>
+    <Reference Include="BIMlify.CategorySelectSupport">
+      <HintPath>..\..\BIMlify.CategorySelectSupport.dll</HintPath>
+    </Reference>
+  <Reference Include="BIMlify.PlanRangeUi"><HintPath>..\..\BIMlify.PlanRangeUi.dll</HintPath></Reference></ItemGroup>
+</Project>
+
+

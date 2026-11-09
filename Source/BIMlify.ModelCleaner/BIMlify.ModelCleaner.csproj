@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>BIMlify.ModelCleaner</AssemblyName>
+    <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
+    <UseWindowsForms>True</UseWindowsForms>
+    <TargetFramework>net40</TargetFramework>
+  </PropertyGroup>
+  <PropertyGroup>
+    <LangVersion>14.0</LangVersion>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <CheckForOverflowUnderflow>False</CheckForOverflowUnderflow>
+  </PropertyGroup>
+  <PropertyGroup />
+  <ItemGroup />
+  <ItemGroup>
+    <Reference Include="RevitAPI"><HintPath>C:\Program Files\Autodesk\Revit 2024\RevitAPI.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="RevitAPIUI"><HintPath>C:\Program Files\Autodesk\Revit 2024\RevitAPIUI.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="System.Core" />
+    <Reference Include="BIMlify.ProgressOverlay">
+      <HintPath>..\..\BIMlify.ProgressOverlay.dll</HintPath>
+    </Reference>
+    <Reference Include="BIMlify.CleanerUi">
+      <HintPath>..\..\BIMlify.CleanerUi.dll</HintPath>
+    </Reference>
+    <Reference Include="BIMlify.PlanRangeUi">
+      <HintPath>..\..\BIMlify.PlanRangeUi.dll</HintPath>
+    </Reference>
+    <Reference Include="BIMlify.ReviewRunGate">
+      <HintPath>..\..\BIMlify.ReviewRunGate.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+</Project>
