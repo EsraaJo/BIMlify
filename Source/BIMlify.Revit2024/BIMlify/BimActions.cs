@@ -853,7 +853,11 @@ internal static class BimActions
 				if (!dashboard)
 				{
 					ReturnToMainMenu = true;
-					owner.DialogResult = DialogResult.Cancel;
+					// Secondary BIMlify windows are modeless. Assigning DialogResult to a
+					// modeless form can throw and leave the navigation action half-complete.
+					// Closing is sufficient: the owning tool restores the dashboard in its
+					// FormClosed handler.
+					if (owner.Modal) owner.DialogResult = DialogResult.Cancel;
 					owner.Close();
 				}
 				break;

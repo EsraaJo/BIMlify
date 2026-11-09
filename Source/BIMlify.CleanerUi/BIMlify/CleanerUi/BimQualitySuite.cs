@@ -46,9 +46,9 @@ namespace BIMlify.CleanerUi
         private static string _dashboardTitle;
         private static readonly string[] ToolNames = {
             "Door & Window Audit", "Finishes Checker",
-            "Level & Grid Audit", "LOD & Deliverables Checker", "Model Health Score",
+            "Level & Grid Audit", "LOD & Deliverables Checker",
             "Naming Convention Checker", "Opening Checker", "Parameter Audit",
-            "Revision Manager", "Room Data Checker", "Sheet Audit", "Workset Checker", "Project Standards"
+            "Revision Manager", "Room Data Checker", "Sheet Audit", "Workset Checker", "Project Standards", "Model Health Score"
         };
         private static readonly string[] StandaloneToolNames = { "PDF Batch Export", "Model Change Log", "Parameter Mapping", "BIM Task Planner", "Smart Links", "Quantity Reports" };
         private static readonly string[] StandaloneTitles = { "Smart Export", "Smart Log", "Smart Map", "Smart Planner", "Smart Links", "Quantity Reports" };
