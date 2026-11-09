@@ -13,6 +13,9 @@
 *.orig
 *.cs.before-*
 *.cs.bak-*
+BIMlify.Revit2024.dll
+BIMlify.Revit2024.HeaderFix.dll
+BIMlify.Revit2024.HeaderFix.QuickBarFix.DashboardBg.dll
 
 # Revit and Windows transient files
 *.log
