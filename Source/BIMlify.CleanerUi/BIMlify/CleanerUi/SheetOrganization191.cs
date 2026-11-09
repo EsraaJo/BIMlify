@@ -52,7 +52,17 @@ namespace BIMlify.CleanerUi
             };
             var organization = new TabPage("Sheets organization") { BackColor = System.Drawing.Color.White };
             var tools = new TabPage("Edit/copy sheets") { BackColor = System.Drawing.Color.White, Padding = new Padding(6) };
-            Action saveCopyTab = PopulateTools(form, tools, original, ui.Document, out var copyActions, out var duplicateViews);
+            var revisions = Revision.GetAllRevisionIds(ui.Document)
+                .Select(id => ui.Document.GetElement(id) as Revision)
+                .Where(revision => revision != null)
+                .OrderBy(revision => revision.SequenceNumber)
+                .ToList();
+            var revisionChoices = revisions.GroupBy(RevisionLabel, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.Last().Id, StringComparer.Ordinal);
+            const string noRevision = "(No revision)";
+            revisionChoices[noRevision] = ElementId.InvalidElementId;
+            Action saveCopyTab = PopulateTools(form, tools, original, ui.Document, revisionChoices, noRevision,
+                out var copyActions, out var duplicateViews);
             host.Controls.Remove(original);
             organization.Controls.Add(original);
             tabs.TabPages.Add(organization);
@@ -115,15 +125,6 @@ namespace BIMlify.CleanerUi
             none.Click += (sender, args) => SetChecked(original, false);
             // The original browser-group column often contains an unresolved "???".
             // Reuse that space for a useful, project-backed revision field instead.
-            var revisions = Revision.GetAllRevisionIds(ui.Document)
-                .Select(id => ui.Document.GetElement(id) as Revision)
-                .Where(revision => revision != null)
-                .OrderBy(revision => revision.SequenceNumber)
-                .ToList();
-            var revisionChoices = revisions.GroupBy(RevisionLabel, StringComparer.Ordinal)
-                .ToDictionary(group => group.Key, group => group.Last().Id, StringComparer.Ordinal);
-            const string noRevision = "(No revision)";
-            revisionChoices[noRevision] = ElementId.InvalidElementId;
             var revisionColumn = new DataGridViewComboBoxColumn
             {
                 Name = "CurrentRevision",
@@ -225,7 +226,11 @@ namespace BIMlify.CleanerUi
                         .Where(row => Convert.ToBoolean(row.Cells[0].Value)), 3, 4);
                     SaveSheetRevisions(ui.Document, original.Rows.Cast<DataGridViewRow>()
                         .Where(row => Convert.ToBoolean(row.Cells[0].Value)), 1, revisionChoices, noRevision);
-                    DashboardEnhancements.ShowSettingsStyleMessage(form, "Smart Sheets", "Sheet changes saved.");
+                    if (loadedStatus != null)
+                    {
+                        loadedStatus.ForeColor = Color.FromArgb(39, 125, 72);
+                        loadedStatus.Text = "Sheet changes saved.";
+                    }
                 }
                 catch (Exception error) { DashboardEnhancements.ShowSettingsStyleMessage(form, "Smart Sheets", error.Message); }
             });
@@ -360,7 +365,9 @@ namespace BIMlify.CleanerUi
                 .Select(folder => (folder.Name ?? "").Trim())
                 .Where(name => name.Length > 0 && name.Any(character => character != '?')));
 
-        private static Action PopulateTools(Form form, TabPage page, DataGridView original, Document doc, out Button[] actions, out CheckBox duplicateViews)
+        private static Action PopulateTools(Form form, TabPage page, DataGridView original, Document doc,
+            IReadOnlyDictionary<string, ElementId> revisionChoices, string noRevision,
+            out Button[] actions, out CheckBox duplicateViews)
         {
             var browser = BrowserOrganization.GetCurrentBrowserOrganizationForSheets(doc);
             Func<ViewSheet, string> groupPath = sheet => DisplayBrowserGroup(browser, sheet);
@@ -392,14 +399,25 @@ namespace BIMlify.CleanerUi
             // unavailable for a browser organisation and then reads as "???".
             // The value remains attached to each row for copy/group operations.
             grid.Columns["Group"].Visible = false;
+            var revisionColumn = new DataGridViewComboBoxColumn
+            {
+                Name = "CurrentRevision",
+                HeaderText = "Current revision",
+                DisplayStyle = DataGridViewComboBoxDisplayStyle.DropDownButton,
+                FlatStyle = FlatStyle.Flat,
+                DataSource = revisionChoices.Keys.OrderBy(text => text == noRevision ? "" : text).ToArray(),
+                SortMode = DataGridViewColumnSortMode.NotSortable
+            };
+            grid.Columns.Add(revisionColumn);
             grid.Columns.Add("Current", "Current sheet number");
             grid.Columns.Add("Number", "New sheet number");
             grid.Columns.Add("Name", "Sheet name");
-            grid.Columns[0].ReadOnly = grid.Columns[1].ReadOnly = true;
+            grid.Columns[0].ReadOnly = grid.Columns[2].ReadOnly = true;
             AttachBatchSheetNames(grid, "Name");
             foreach (var item in sheets)
             {
-                int index = grid.Rows.Add(item.Group, item.Sheet.SheetNumber, item.Sheet.SheetNumber, item.Sheet.Name);
+                int index = grid.Rows.Add(item.Group, CurrentRevisionLabel(item.Sheet, doc, noRevision),
+                    item.Sheet.SheetNumber, item.Sheet.SheetNumber, item.Sheet.Name);
                 grid.Rows[index].Tag = item.Sheet;
             }
             var footer = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, Padding = new Padding(8) };
@@ -423,8 +441,9 @@ namespace BIMlify.CleanerUi
                 {
                     var sheet = (ViewSheet)row.Tag;
                     row.Cells[0].Value = groupPath(sheet);
-                    row.Cells[1].Value = row.Cells[2].Value = sheet.SheetNumber;
-                    row.Cells[3].Value = sheet.Name;
+                    row.Cells[1].Value = CurrentRevisionLabel(sheet, doc, noRevision);
+                    row.Cells[2].Value = row.Cells[3].Value = sheet.SheetNumber;
+                    row.Cells[4].Value = sheet.Name;
                 }
             };
             Action save = () =>
@@ -432,7 +451,8 @@ namespace BIMlify.CleanerUi
                 if (!grid.EndEdit()) return;
                 try
                 {
-                    SaveSheetRows(doc, grid.Rows.Cast<DataGridViewRow>(), 2, 3);
+                    SaveSheetRows(doc, grid.Rows.Cast<DataGridViewRow>(), 3, 4);
+                    SaveSheetRevisions(doc, grid.Rows.Cast<DataGridViewRow>(), 1, revisionChoices, noRevision);
                     reload();
                     status.ForeColor = Color.FromArgb(39, 125, 72);
                     status.Text = "Sheet edits saved.";
@@ -520,7 +540,8 @@ namespace BIMlify.CleanerUi
                 if (copies.Count > 0) grid.ClearSelection();
                 foreach (var sheet in copies)
                 {
-                    int row = grid.Rows.Add(groupPath(sheet), sheet.SheetNumber, sheet.SheetNumber, sheet.Name);
+                    int row = grid.Rows.Add(groupPath(sheet), CurrentRevisionLabel(sheet, doc, noRevision),
+                        sheet.SheetNumber, sheet.SheetNumber, sheet.Name);
                     grid.Rows[row].Tag = sheet;
                     grid.Rows[row].Selected = true;
                 }
