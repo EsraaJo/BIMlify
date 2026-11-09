@@ -662,15 +662,13 @@ namespace BIMlify.CleanerUi
             }
             private string _editTool;
             private string _inventoryProject;
-            private InventoryRow _pendingInventoryEdit;
-            private string _pendingInventoryValue;
+            private List<InventoryEdit> _pendingInventoryEdits = new List<InventoryEdit>();
 
-            internal void RequestInventory(string audit, InventoryRow row = null, string value = null)
+            internal void RequestInventory(string audit, IEnumerable<InventoryEdit> edits = null)
             {
                 Request("QA inventory");
                 _editTool = audit;
-                _pendingInventoryEdit = row;
-                _pendingInventoryValue = value;
+                _pendingInventoryEdits = edits == null ? new List<InventoryEdit>() : edits.ToList();
             }
             private string _collaboratorProject;
             private Action<string> _locateFailed;
@@ -875,19 +873,26 @@ namespace BIMlify.CleanerUi
                     {
                         if (!Window.IsToolSelected(_editTool)) return;
                         string project = AuditProjectKey(doc);
-                        if (_pendingInventoryEdit != null)
+                        List<InventoryEdit> edits = _pendingInventoryEdits;
+                        _pendingInventoryEdits = new List<InventoryEdit>();
+                        if (edits.Count > 0)
                         {
                             if (project != _inventoryProject)
                                 throw new InvalidOperationException("Return to the project that produced this table.");
-                            Element element = doc.GetElement(_pendingInventoryEdit.UniqueId);
-                            if (element == null || !AuditFields(element).TryGetValue(_pendingInventoryEdit.Field, out var edit))
-                                throw new InvalidOperationException("This field is no longer writable.");
-                            if (!String.Equals(edit.Item1 ?? "", _pendingInventoryEdit.Value ?? "", StringComparison.Ordinal))
-                                throw new InvalidOperationException("The value changed in Revit. Reload the table and try again.");
+                            var writable = new List<Tuple<InventoryEdit, Tuple<string, Action<string>>>>();
+                            foreach (InventoryEdit pending in edits)
+                            {
+                                Element element = doc.GetElement(pending.Row.UniqueId);
+                                if (element == null || !AuditFields(element).TryGetValue(pending.Row.Field, out var edit))
+                                    throw new InvalidOperationException("One or more fields are no longer writable.");
+                                if (!String.Equals(edit.Item1 ?? "", pending.Row.Value ?? "", StringComparison.Ordinal))
+                                    throw new InvalidOperationException("A value changed in Revit. Reload the table and try again.");
+                                writable.Add(Tuple.Create(pending, edit));
+                            }
                             using (var transaction = new Transaction(doc, "BIMlify edit project element"))
                             {
                                 transaction.Start();
-                                edit.Item2(_pendingInventoryValue);
+                                foreach (var pending in writable) pending.Item2.Item2(pending.Item1.Value);
                                 if (transaction.Commit() != TransactionStatus.Committed)
                                     throw new InvalidOperationException("Revit did not save this change.");
                             }
@@ -908,6 +913,8 @@ namespace BIMlify.CleanerUi
                                         inventory.Add(row);
                                     }
                             Window.ShowInventory(inventory);
+                            if (edits.Count > 0)
+                                Window.SetStatus(edits.Count + " change(s) saved.");
                         }
                         return;
                     }
@@ -981,6 +988,12 @@ namespace BIMlify.CleanerUi
         private sealed class InventoryRow
         {
             internal string UniqueId, Id, Category, Name, Field, Value, SheetNumber;
+        }
+
+        private sealed class InventoryEdit
+        {
+            internal InventoryRow Row;
+            internal string Value;
         }
 
         private static IEnumerable<Element> InventoryElements(Document doc, string tool)
@@ -1627,6 +1640,7 @@ namespace BIMlify.CleanerUi
             private readonly Label _filterLabel = new Label();
             private bool _updatingFilter;
             private readonly Button _run = new Button();
+            private readonly Button _saveInventory = new Button();
             private readonly Button _locate = new Button();
             private readonly Button _import = new Button();
             private readonly Button _export = new Button();
@@ -1647,6 +1661,7 @@ namespace BIMlify.CleanerUi
             private string _rowsForTool = "";
             private bool _loadingPdfSheets;
             private bool _pdfEditPending;
+            private readonly Dictionary<string, InventoryEdit> _inventoryChanges = new Dictionary<string, InventoryEdit>(StringComparer.Ordinal);
             private bool _gridLayoutQueued;
             private string _taskProjectKey = "";
             private string _taskProjectName = "";
@@ -1912,7 +1927,7 @@ namespace BIMlify.CleanerUi
                 else if (String.Equals(_standaloneTool, "PDF Batch Export", StringComparison.Ordinal))
                 {
                     _smartExportTabs = CreateSmartExportTabs();
-                    _pdfExportPage = new TabPage("PDF Batch") { BackColor = Color.White, Padding = new Padding(7) };
+                    _pdfExportPage = new TabPage("PDF/DWG Batch") { BackColor = Color.White, Padding = new Padding(7) };
                     _nwcExportPage = new TabPage("NWC Export") { BackColor = Color.White, Padding = new Padding(7) };
                     Panel pdfContent = new Panel { Dock = DockStyle.Fill, BackColor = Color.White };
                     pdfContent.Controls.Add(gridFrame); pdfContent.Controls.Add(_stageFilterBar); pdfContent.Controls.Add(intro);
@@ -1967,9 +1982,10 @@ namespace BIMlify.CleanerUi
                 _export = MakeButton("Export CSV", 104, false); _export.Click += (s,e) => ExportCsv();
                 _locate = MakeButton("Locate Element", 112, false); _locate.Enabled = false; _locate.Click += (s,e) => LocateSelectedElements();
                 _run = MakeButton("Run Check", 96, true); _run.Click += (s,e) => RunSelected();
+                _saveInventory = MakeButton("Save Changes", 112, true); _saveInventory.Visible = false; _saveInventory.Click += (s,e) => SaveInventoryChanges();
                 // FlowDirection is right-to-left: insert Locate Element after Run Check
                 // visually, before the next applicable footer action, with shared margins.
-                _actions.Controls.Add(close); _actions.Controls.Add(_addTask); _actions.Controls.Add(_deleteTask); _actions.Controls.Add(_snapshot); _actions.Controls.Add(_trace); _actions.Controls.Add(_refreshCollaborators); _actions.Controls.Add(_import); _actions.Controls.Add(_export); _actions.Controls.Add(_locate); _actions.Controls.Add(_run);
+                _actions.Controls.Add(close); _actions.Controls.Add(_saveInventory); _actions.Controls.Add(_addTask); _actions.Controls.Add(_deleteTask); _actions.Controls.Add(_snapshot); _actions.Controls.Add(_trace); _actions.Controls.Add(_refreshCollaborators); _actions.Controls.Add(_import); _actions.Controls.Add(_export); _actions.Controls.Add(_locate); _actions.Controls.Add(_run);
                 bottom.Controls.Add(_status); bottom.Controls.Add(_actions);
                 bottom.Resize += (s,e) => LayoutFooter();
 
@@ -2805,7 +2821,13 @@ namespace BIMlify.CleanerUi
                 }
                 _run.Visible = t != "BIM Task Planner" && !smartTrace && !versionPage;
                 _import.Visible = _import.Enabled = t == "Sheet Audit" || t == "Parameter Mapping" || t == "Excel ↔ Revit Data Checker";
-                if (_auditTabs?.SelectedIndex == 1) { _run.Text = "Reload Elements"; _run.Width = Math.Max(128, TextRenderer.MeasureText(_run.Text, _run.Font).Width + 24); }
+                if (_auditTabs?.SelectedIndex == 1)
+                {
+                    _run.Text = "Reload Elements";
+                    _run.Width = Math.Max(128, TextRenderer.MeasureText(_run.Text, _run.Font).Width + 24);
+                    UpdateInventorySaveState();
+                }
+                else if (_saveInventory != null) _saveInventory.Visible = false;
                 _snapshot.Visible = t == "Model Change Log" && !smartTrace && !versionPage;
                 _snapshot.Enabled = _snapshot.Visible && !_collaboratorsLoading;
                 _run.Enabled = !_collaboratorsLoading;
@@ -3139,8 +3161,18 @@ namespace BIMlify.CleanerUi
                     var row = _inventory.Rows[args.RowIndex];
                     if (args.ColumnIndex != 4 || !(row.Tag is InventoryRow data) || data.Field == null) return;
                     string value = Convert.ToString(row.Cells[4].Value) ?? "";
-                    row.Cells[4].Value = data.Value;
-                    if (value != data.Value) QueueInventory(data, value);
+                    string key = (data.UniqueId ?? "") + "|" + (data.Field ?? "");
+                    if (String.Equals(value, data.Value ?? "", StringComparison.Ordinal))
+                    {
+                        _inventoryChanges.Remove(key);
+                        row.Cells[4].Style.BackColor = Color.FromArgb(255, 248, 226);
+                    }
+                    else
+                    {
+                        _inventoryChanges[key] = new InventoryEdit { Row = data, Value = value };
+                        row.Cells[4].Style.BackColor = Color.FromArgb(255, 239, 196);
+                    }
+                    UpdateInventorySaveState();
                 };
                 findings.Controls.Add(_grid);
                 elements.Controls.Add(_inventory);
@@ -3203,16 +3235,41 @@ namespace BIMlify.CleanerUi
                 _auditLoadTimer.Start();
             }
 
-            private void QueueInventory(InventoryRow row = null, string value = null)
+            private void QueueInventory()
             {
                 if (_externalEvent == null || _externalEvent.IsPending)
                 {
                     SetStatus("Revit is busy. Try again shortly.");
                     return;
                 }
-                _handler.RequestInventory(_tools.SelectedItem as string, row, value);
-                SetStatus(row == null ? "Loading project elements…" : "Saving the value in Revit…");
+                _handler.RequestInventory(_tools.SelectedItem as string);
+                SetStatus("Loading project elements…");
                 BimQualitySuite.RaiseEvent();
+            }
+
+            private void SaveInventoryChanges()
+            {
+                if (_inventoryChanges.Count == 0) { SetStatus("No edited values to save."); return; }
+                if (_externalEvent == null || _externalEvent.IsPending)
+                {
+                    SetStatus("Revit is busy. Try again shortly.");
+                    return;
+                }
+                _handler.RequestInventory(_tools.SelectedItem as string, _inventoryChanges.Values);
+                _saveInventory.Enabled = false;
+                SetStatus("Saving " + _inventoryChanges.Count + " change(s) in Revit…");
+                BimQualitySuite.RaiseEvent();
+            }
+
+            private void UpdateInventorySaveState()
+            {
+                if (_saveInventory == null || _saveInventory.IsDisposed) return;
+                _saveInventory.Visible = _auditTabs?.SelectedIndex == 1;
+                _saveInventory.Enabled = _inventoryChanges.Count > 0;
+                _saveInventory.Text = _inventoryChanges.Count > 0
+                    ? "Save Changes (" + _inventoryChanges.Count + ")"
+                    : "Save Changes";
+                _saveInventory.Width = Math.Max(112, TextRenderer.MeasureText(_saveInventory.Text, _saveInventory.Font).Width + 24);
             }
 
             internal void ShowInventory(List<InventoryRow> rows)
@@ -3222,6 +3279,7 @@ namespace BIMlify.CleanerUi
                 try
                 {
                     _inventory.Rows.Clear();
+                    _inventoryChanges.Clear();
                     foreach (var row in rows)
                     {
                         int index = _inventory.Rows.Add(row.Id, row.Category, row.Name, row.Field, row.Value);
@@ -3235,9 +3293,10 @@ namespace BIMlify.CleanerUi
                 finally { _inventory.ResumeLayout(); }
                 ConfigureResultFilter(false, null, rows.Select(row => row.Category));
                 ApplyStageFilter();
+                UpdateInventorySaveState();
                 SetStatus(rows.Count == 0 && UseRevitSelection
                     ? "No matching elements in the current Revit selection."
-                    : rows.Count + " row(s). Edit a highlighted value and press Enter to save.");
+                    : rows.Count + " row(s). Edit highlighted values, then click Save Changes.");
             }
 
             private void UpdateLocateButton()
@@ -3780,7 +3839,7 @@ namespace BIMlify.CleanerUi
                 CheckedListBox list = new CheckedListBox { Left = 4, Top = 202, Width = 570, Height = 168, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, CheckOnClick = true, IntegralHeight = false, ScrollAlwaysVisible = true, HorizontalScrollbar = false, BackColor = Color.White, Font = new Font("Segoe UI", 8f, FontStyle.Regular), ItemHeight = 20 };
                 foreach (PdfSheetInfo sheet in availableSheets) list.Items.Add(sheet, true);
                 Button selectAll = DashboardEnhancements.CreateSettingsStyleButton("Select all", DialogResult.None); selectAll.SetBounds(4, 376, 96, 28);
-                Button clear = DashboardEnhancements.CreateSettingsStyleButton("Clear Selection", DialogResult.None); clear.SetBounds(108, 376, 108, 28); clear.BackColor = Color.FromArgb(252, 226, 226);
+                Button clear = DashboardEnhancements.CreateSettingsStyleButton("Clear Selection", DialogResult.None); clear.SetBounds(108, 376, 108, 28); clear.BackColor = Color.White;
                 GoldCheckBox combine = new GoldCheckBox { Text = "Combine selected sheets into one PDF", Left = 228, Top = 379, Width = 250, Height = 22, Checked = true, ForeColor = ink, BackColor = surface, Font = new Font("Segoe UI", 8f) };
                 GoldCheckBox exportDwg = new GoldCheckBox { Text = "Export DWG with PDF", Left = 482, Top = 379, Width = 160, Height = 22, ForeColor = ink, BackColor = surface, Font = new Font("Segoe UI", 8f) };
                 Label printLabel = new Label { Text = "PRINT SETTINGS", Left = 4, Top = 410, Width = 200, Height = 18, Font = new Font("Segoe UI", 8.5f, FontStyle.Bold), ForeColor = ink };

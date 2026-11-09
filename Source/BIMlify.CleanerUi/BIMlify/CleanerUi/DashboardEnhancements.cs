@@ -1630,6 +1630,10 @@ public static class DashboardEnhancements
 
     internal static Button CreateSettingsStyleButton(string text, DialogResult result)
     {
+        // A bare "Clear" is ambiguous in a model tool.  Use one consistent action
+        // label everywhere this shared factory is used.
+        if (String.Equals((text ?? String.Empty).Trim(), "Clear", StringComparison.OrdinalIgnoreCase))
+            text = "Clear Selection";
         Button button = null;
         try
         {

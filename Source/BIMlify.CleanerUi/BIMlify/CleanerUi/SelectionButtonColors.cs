@@ -72,11 +72,11 @@ namespace BIMlify.CleanerUi
             {
                 button.UseVisualStyleBackColor = false;
                 button.FlatStyle = FlatStyle.Flat;
-                button.BackColor = Color.FromArgb(251, 225, 225);
+                button.BackColor = Color.White;
                 button.FlatAppearance.BorderSize = 1;
-                button.FlatAppearance.BorderColor = Color.FromArgb(196, 134, 134);
-                button.FlatAppearance.MouseOverBackColor = Color.FromArgb(255, 236, 236);
-                button.FlatAppearance.MouseDownBackColor = Color.FromArgb(245, 215, 215);
+                button.FlatAppearance.BorderColor = Color.FromArgb(150, 158, 166);
+                button.FlatAppearance.MouseOverBackColor = Color.FromArgb(246, 248, 250);
+                button.FlatAppearance.MouseDownBackColor = Color.FromArgb(235, 239, 243);
                 return;
             }
             if (button.GetType() != typeof(Button) || button.FlatStyle != FlatStyle.Flat ||
@@ -113,8 +113,8 @@ namespace BIMlify.CleanerUi
             }
             else if (IsClearSelection(caption))
             {
-                fill = Color.FromArgb(251, 225, 225);
-                border = Color.FromArgb(196, 134, 134);
+                fill = Color.White;
+                border = Color.FromArgb(150, 158, 166);
             }
         }
     }
