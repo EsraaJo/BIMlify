@@ -135,7 +135,14 @@ public static partial class Entry
             }
             operation = op;
             advancedOperation = advanced;
-			pending = ((rowsProvider == null) ? new List<RowData>() : rowsProvider());
+			// Reading rows may touch the Revit document.  Do that only inside the
+			// ExternalEvent for operations that actually need the grid selection.
+			// "visible" and "reset" must not access Revit from this modeless UI.
+			pending = new List<RowData>();
+			if (advanced == null && op != "reset" && op != "visible")
+			{
+				pending = ((rowsProvider == null) ? new List<RowData>() : rowsProvider());
+			}
 			if (advanced == null && op != "reset" && op != "visible" && pending.Count == 0)
 			{
 				SetStatus("Select at least one item first.");
