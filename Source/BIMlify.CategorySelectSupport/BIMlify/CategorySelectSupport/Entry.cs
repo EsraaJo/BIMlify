@@ -720,7 +720,12 @@ public static partial class Entry
             };
 			form.FormClosed += (object s, FormClosedEventArgs e2) =>
 			{
-                application.ViewActivated -= onViewActivated;
+                // FormClosed is raised by WinForms, not Revit.  Removing a
+                // Revit event subscription here is an API call outside the
+                // valid API context and triggers Revit's fatal exception.
+                // The listener is deliberately kept passive; it exits
+                // immediately for a disposed form, while all operations
+                // already validate the original project in Execute().
 				handler.Dispose();
 				if (current == form)
 				{
@@ -756,7 +761,9 @@ public static partial class Entry
                 if (form.IsDisposed) return;
                 current = form;
                 currentProject = sourceProject;
-                application.ViewActivated += onViewActivated;
+                // Do not subscribe to ViewActivated from this modeless form.
+                // Revit requires the matching unsubscribe to occur in an API
+                // context, whereas FormClosed occurs on the WinForms thread.
                 foreach (Form dashboard in dashboardWindowsToRestore)
                 {
                     if (dashboard.IsDisposed) continue;
